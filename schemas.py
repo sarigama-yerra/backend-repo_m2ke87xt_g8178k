@@ -1,48 +1,165 @@
 """
-Database Schemas
+Hostel Management System Schemas (MongoDB via Pydantic)
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model name corresponds to a collection with the lowercase name
+(e.g., class User -> "user"). These models are used for validation on
+API inputs and for documentation only; MongoDB stores BSON documents.
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Note: Passwords are intentionally stored as plain strings as per requirements
+(no bcrypt). Consider using secure hashing in production.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Literal
+from datetime import date, datetime
 
-# Example schemas (replace with your own):
-
+# ---------------------------------
+# AUTH / USERS
+# ---------------------------------
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    name: str
+    email: EmailStr
+    password: str  # plain text or custom hash per requirements
+    role: Literal["admin", "warden", "staff", "student"] = "student"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+# ---------------------------------
+# STUDENTS
+# ---------------------------------
+class GuardianInfo(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    relation: Optional[str] = None
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Student(BaseModel):
+    user_id: str
+    dob: Optional[date] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    guardian_info: Optional[GuardianInfo] = None
+    additional_details: Optional[dict] = None
+    documents: Optional[List[dict]] = None  # uploaded doc metadata
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ---------------------------------
+# HOSTELS / ROOMS
+# ---------------------------------
+class Hostel(BaseModel):
+    name: str
+    location: Optional[str] = None
+    warden_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class Room(BaseModel):
+    hostel_id: str
+    room_no: str
+    capacity: int = Field(ge=1)
+    current_occupancy: int = 0
+    type: Optional[str] = None  # single, double, triple, etc.
+    floor: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class RoomAllocation(BaseModel):
+    student_id: str
+    room_id: str
+    allocation_date: date
+    exit_date: Optional[date] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ---------------------------------
+# FEES / PAYMENTS
+# ---------------------------------
+class Fee(BaseModel):
+    student_id: str
+    amount: float
+    due_date: date
+    status: Literal["paid", "unpaid"] = "unpaid"
+    transaction_id: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ---------------------------------
+# ATTENDANCE
+# ---------------------------------
+class Attendance(BaseModel):
+    student_id: str
+    date: date
+    status: Literal["present", "absent", "leave"]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class LateEntry(BaseModel):
+    student_id: str
+    date_time: datetime
+    reason: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class LeaveRequest(BaseModel):
+    student_id: str
+    from_date: date
+    to_date: date
+    reason: Optional[str] = None
+    status: Literal["pending", "approved", "rejected"] = "pending"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ---------------------------------
+# COMPLAINTS / GRIEVANCES
+# ---------------------------------
+class Complaint(BaseModel):
+    student_id: str
+    category: str
+    description: str
+    status: Literal["open", "in_progress", "resolved", "closed"] = "open"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ComplaintUpdate(BaseModel):
+    complaint_id: str
+    message: str
+    updated_by: str  # user_id of staff/warden
+    updated_at: Optional[datetime] = None
+
+
+# ---------------------------------
+# INVENTORY (optional)
+# ---------------------------------
+class Inventory(BaseModel):
+    name: str
+    quantity: int = 0
+    hostel_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class Maintenance(BaseModel):
+    item_id: str
+    description: Optional[str] = None
+    date: date
+    cost: Optional[float] = 0.0
+    status: Literal["pending", "in_progress", "done"] = "pending"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ---------------------------------
+# NOTIFICATIONS
+# ---------------------------------
+class Notification(BaseModel):
+    user_id: str
+    type: Optional[str] = "info"  # email, sms, in_app, etc.
+    message: str
+    status: Literal["unread", "read"] = "unread"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
